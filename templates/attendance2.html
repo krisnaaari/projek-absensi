@@ -130,12 +130,12 @@
                     <tbody>
                         {% for log in logs %}
                         <tr style="border-top: 2px groove; border-left: 2px groove; border-right: 2px groove;">
-                            <td rowspan="2">{{ log.nama }}</td>
+                            <td rowspan="2">{{ log.nama_karyawan }}</td>
                             <td rowspan="2">{{ log.nama_proyek }}</td>
                             <td>Datang: {{ log.waktu_datang }} </td>
                             <td>Datang: {{ log.latitude_datang }}, {{ log.longitude_datang }}</td>
                             <td rowspan="2">
-                                <img src="{{ url_for('static', filename='images/' + log.photo) }}" 
+                                <img src="{{ url_for('static', filename='images/' + log.foto) }}" 
                                      class="img-fluid table-thumbnail" 
                                      alt="Attendance Photo">
                             </td>
