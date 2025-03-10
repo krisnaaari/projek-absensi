@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #c1daf3;
+            font-family: 'Arial', sans-serif;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        .user-header {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .user-header .user-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .user-header img {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 50%;
+        }
+        .camera-section {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        #video, #canvas {
+            max-width: 100%;
+            border-radius: 12px;
+        }
+        .modal-body video {
+            border-radius: 12px;
+        }
+        .attendance-logs {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            padding: 1.5rem;
+        }
+        .btn-camera {
+            transition: all 0.3s ease;
+            border-radius: 10px;
+        }
+        .btn-camera:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead {
+            background-color: #f8f9fa;
+            color: #343a40;
+        }
+        .table-thumbnail {
+            max-width: 100px;
+            border-radius: 8px;
+            object-fit: cover;
+        }
+        @media (max-width: 768px) {
+            .table-responsive {
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="user-header mt-4">
+            <div class="user-info">
+                <h2 class="mb-0">Welcome, {{ user.nama }}</h2>
+                <img src="../../static/images/data_wajah/{{user.ID}}.png" alt="User Profile" class="border">
+            </div>
+        </div>
+
+        <!-- Alert -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{category}} alert-dismissible fade show" role="alert">
+                        {{message}}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <form id="attendanceForm" method="POST" class="col-md-auto">
+            <div class="user-header user-info">
+                <label for="project">Pilih Proyek:</label>
+                <select id="project" name="project" class="form-control mb-3">
+                    {% for project in projects %}
+                        <option value="{{ project.id_proyek }}">{{ project.nama_proyek }}</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="image" id="image">
+                <input type="hidden" name="longitude" id="longitude">
+                <input type="hidden" name="latitude" id="latitude">
+            </div>
+
+            <!-- Camera and Snapshot Section -->
+            <div class="camera-section">
+                <div class="row justify-content-center mb-3">
+                    <div class="col-md-auto">
+                        <button type="button" class="btn btn-primary btn-camera" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                            Take Selfie
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Captured Image Canvas -->
+                <div class="row justify-content-center">
+                    <div class="col-md-8">
+                        <canvas 
+                            class='border w-100' 
+                            id="canvas" 
+                            width="1280" 
+                            height="720" 
+                            style='background-image: url("../../static/images/person_13924070.png"); 
+                                background-repeat: no-repeat; 
+                                background-position: center; 
+                                background-size: 50%;'
+                        ></canvas>
+                    </div>
+                </div>
+
+                <!-- Attendance Form -->
+                <div class="mt-3 d-flex justify-content-center align-items-center">
+                    <button type="submit" class="btn btn-success" style="display: none;" id="submitButton">Submit Attendance</button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Attendance Logs Table -->
+        <div class="attendance-logs mb-4">
+            <h3 class="mb-4">Attendance History</h3>
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                        <tr>
+                            <th>Nama</th>
+                            <th>Waktu</th>
+                            <th>Koordinat</th>
+                            <th>Photo</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs %}
+                        <tr>
+                            <td rowspan="2">{{ log.nama }}</td>
+                            <td>Datang: {{ log.datang }} </td>
+                            <td>Datang: {{ log.latitude_datang }}, {{ log.longitude_datang }}</td>
+                            <td rowspan="2">
+                                <img src="{{ url_for('static', filename='images/' + log.photo) }}" 
+                                     class="img-fluid table-thumbnail" 
+                                     alt="Attendance Photo">
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Pulang: {{log.pulang if log.pulang != None else "-"}}</td>
+                            <td>Pulang: {{log.latitude_pulang if log.latitude_pulang != None else "-"}}, 
+                                {{log.longitude_pulang if log.longitude_pulang != None else "-"}}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div class="modal fade" id="exampleModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5">Take Selfie</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body text-center">
+                    <video class="border mx-auto" id="video" name='video' width="300" height="300" autoplay></video>
+                    <div class="alert alert-success text-center mt-3" role="alert" style="display: none;" id="alert-foto">
+                        Selfie taken successfully
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button id="snap" class="btn btn-primary">Capture Photo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- JavaScript for Camera and Geolocation -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const snap = document.getElementById('snap');
+            const image = document.getElementById('image');
+            const longitude = document.getElementById('longitude');
+            const latitude = document.getElementById('latitude');
+            const snapshot = document.getElementById('snapshot');
+            const alertFoto = document.getElementById('alert-foto');
+            const submitButton = document.getElementById('submitButton');
+
+            // Access camera
+            navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                })
+                .catch(function(err) {
+                    console.error("Error accessing camera: ", err);
+                });
+
+            // Capture snapshot
+            snap.addEventListener('click', function() {
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/png');  // Konversi kanvas ke base64
+
+                // Jika ada elemen input hidden untuk image base64
+                if (image) {
+                    image.value = imageData;
+                }
+
+                alertFoto.style.display = 'block';
+                
+                submitButton.style.display = 'block';
+                setTimeout(function() {
+                        alertFoto.style.display = 'none';
+                    }, 3000);
+
+            });
+
+            // Get geolocation
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    longitude.value = position.coords.longitude;
+                    latitude.value = position.coords.latitude;
+                }, function(error) {
+                    console.error("Error getting geolocation: ", error);
+                }, {
+                    enableHighAccuracy: true,  // Meningkatkan akurasi GPS
+                    //timeout: 5000,             // Maksimum waktu tunggu dalam milidetik
+                    maximumAge: 0              // Tidak menggunakan lokasi yang di-cache
+                });
+            } else {
+                console.error("Geolocation is not supported by this browser.");
+            }
+        });
+    </script>
+</body>
+</html>
+
