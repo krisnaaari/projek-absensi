@@ -83,10 +83,12 @@
 
         <!-- Date Selection Section -->
         <div class="date-selection">
-            <form method="post" onsubmit="return validateForm()" name="myform">
+            <form method="get" onsubmit="return validateForm()" name="myform">
                 <div class="row align-items-center gap-3">
-                    <label for="tanggal" class="col">Select Date:</label>
-                    <input type="date" id="tanggal" name="tanggal" class="form-control col">
+                    <label for="tanggal" class="col">Pilih tanggal:</label>
+                    <input type="date" id="tanggal1" name="tanggal1" class="form-control col">
+                    s/d
+                    <input type="date" id="tanggal2" name="tanggal2" class="form-control col">
                     <button class='btn btn-primary btn-submit col' type="submit">Submit</button>
                 </div>
             </form>
@@ -103,32 +105,29 @@
                 <table class="table align-middle border-radius-xl">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Time</th>
-                            <th>Location</th>
-                            <th>Photo</th>
+                            <th>Nama</th>
+                            <th>Nama Proyek</th>
+                            <th>Waktu</th>
+                            <th>Koordinat</th>
+                            <th>Foto</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for log in logs %}
                         <tr style="border-top: 2px groove; border-left: 2px groove; border-right: 2px groove;">
-                            <td rowspan="3">{{ log.nama }}</td>
-                            <td>Morning: {{ log.datang }} </td>
-                            <td>Morning: {{ log.latitude_datang }}, {{ log.longitude_datang }}</td>
-                            <td rowspan="3">
-                                <img src="{{ url_for('static', filename='images/' + log.photo) }}" 
+                            <td rowspan="2">{{ log.nama_karyawan }}</td>
+                            <td rowspan="2">{{ log.nama_proyek}}</td>
+                            <td>Datang: {{ log.waktu_datang }} </td>
+                            <td>Datang: {{ log.latitude_datang }}, {{ log.longitude_datang }}</td>
+                            <td rowspan="2">
+                                <img src="{{ url_for('static', filename='images/' + log.foto) }}" 
                                      class="img-fluid table-thumbnail" 
                                      alt="Attendance Photo">
                             </td>
                         </tr>
-                        <!-- <tr style="border-left: 2px groove; border-right: 2px groove;">
-                            <td >Midday: {{ log.istirahat if log.istirahat != None else "-" }}</td>
-                            <td >Midday: {{ log.latitude_istirahat if log.latitude_istirahat != None else "-" }}, 
-                                {{log.longitude_istirahat if log.longitude_istirahat != None else "-" }}</td>
-                        </tr> -->
                         <tr style="border-left: 2px groove; border-right: 2px groove; border-bottom: 2px groove;">
-                            <td>Evening: {{log.pulang if log.pulang != None else "-"}}</td>
-                            <td>Evening: {{log.latitude_pulang if log.latitude_pulang != None else "-"}}, 
+                            <td>Pulang: {{log.waktu_pulang if log.waktu_pulang != None else "-"}}</td>
+                            <td>Pulang: {{log.latitude_pulang if log.latitude_pulang != None else "-"}}, 
                                 {{log.longitude_pulang if log.longitude_pulang != None else "-"}}</td>
                         </tr>
                         {% endfor %}
@@ -141,8 +140,10 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         function validateForm() {
-            let x = document.forms['myform']['tanggal'].value;
-            if (x == "") {
+            let tanggal1 = document.forms['myform']['tanggal1'].value;
+            let tanggal2 = document.forms['myform']['tanggal2'].value;
+
+            if (tanggal1 === "" || tanggal2 === "") {
                 document.getElementById('pemberitahuan').style.display = 'block';
                 return false;
             }
