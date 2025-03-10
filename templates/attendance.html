@@ -154,6 +154,7 @@
                     <thead>
                         <tr>
                             <th>Nama</th>
+                            <th>Nama Proyek</th>
                             <th>Waktu</th>
                             <th>Koordinat</th>
                             <th>Photo</th>
@@ -161,18 +162,19 @@
                     </thead>
                     <tbody>
                         {% for log in logs %}
-                        <tr>
-                            <td rowspan="2">{{ log.nama }}</td>
-                            <td>Datang: {{ log.datang }} </td>
+                        <tr style="border-top: 2px groove; border-left: 2px groove; border-right: 2px groove;">
+                            <td rowspan="2">{{ log.nama_karyawan }}</td>
+                            <td rowspan="2">{{ log.nama_proyek}}</td>
+                            <td>Datang: {{ log.waktu_datang }} </td>
                             <td>Datang: {{ log.latitude_datang }}, {{ log.longitude_datang }}</td>
                             <td rowspan="2">
-                                <img src="{{ url_for('static', filename='images/' + log.photo) }}" 
+                                <img src="{{ url_for('static', filename='images/' + log.foto) }}" 
                                      class="img-fluid table-thumbnail" 
                                      alt="Attendance Photo">
                             </td>
                         </tr>
-                        <tr>
-                            <td>Pulang: {{log.pulang if log.pulang != None else "-"}}</td>
+                        <tr style="border-left: 2px groove; border-right: 2px groove; border-bottom: 2px groove;">
+                            <td>Pulang: {{log.waktu_pulang if log.waktu_pulang != None else "-"}}</td>
                             <td>Pulang: {{log.latitude_pulang if log.latitude_pulang != None else "-"}}, 
                                 {{log.longitude_pulang if log.longitude_pulang != None else "-"}}</td>
                         </tr>
