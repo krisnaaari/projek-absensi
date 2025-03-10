@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 import pymysql.cursors # type: ignore
 import math
+from dotenv import load_dotenv
 
 
 app = Flask(__name__)
@@ -216,7 +217,7 @@ def compare_faces(face1, face2, threshold=0.55):
     features2 = get_face_features(face2)
     
     # 1. SIFT similarity
-    sift_similarity = match_descriptors(features1['sift'], features2['sift'])
+    #sift_similarity = match_descriptors(features1['sift'], features2['sift'])
     
     # 2. HOG similarity
     hog_similarity = cosine_similarity(features1['hog'].flatten(), features2['hog'].flatten())
@@ -232,12 +233,12 @@ def compare_faces(face1, face2, threshold=0.55):
     hist_similarity = 1 - cv2.compareHist(hist1, hist2, cv2.HISTCMP_BHATTACHARYYA)
     
     # Gabungkan semua skor dengan bobot
-    final_similarity = (sift_similarity * 0.4 + 
+    final_similarity = (0 * 0.4 + 
                        hog_similarity * 0.25 + 
                        lbp_similarity * 0.25 + 
-                       hist_similarity * 0.1)
+                       hist_similarity * 0.50)
     
-    print(f"SIFT Similarity: {sift_similarity:.4f}")
+    #print(f"SIFT Similarity: {sift_similarity:.4f}")
     print(f"HOG Similarity: {hog_similarity:.4f}")
     print(f"LBP Similarity: {lbp_similarity:.4f}")
     print(f"Histogram Similarity: {hist_similarity:.4f}")
@@ -247,7 +248,7 @@ def compare_faces(face1, face2, threshold=0.55):
     
     return final_similarity >= threshold, final_similarity
 
-def face_comparison(image1_path, image2_path, threshold=0.4):
+def face_comparison(image1_path, image2_path, threshold=0.51):
     """
     Fungsi utama untuk membandingkan wajah dalam dua gambar.
     """
@@ -342,59 +343,42 @@ def cek_radius(id_proyek, latitude, longitude, toleransi_radius_km=2.0):
         hasil = False
         return hasil
     
-
-
 def handle_attendance(jenis_absensi, id_karyawan, image_data, longitude, latitude, id_proyek):
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
-    existing_attendance = False
-    print(f"existing attendance: {existing_attendance}")
     
     try:
-        if jenis_absensi == 'pulang':
-            # Check if user has already done the attendance
-            cursor.execute('''
-                SELECT MAX(d.id) AS max_d, MAX(p.id) AS max_p
-                FROM absensi_datang d
-                LEFT JOIN absensi_pulang p
-                ON d.id = p.id
-                WHERE d.id_karyawan = %s
-            ''', (id_karyawan,))
-            hasil = cursor.fetchone()
+        waktu_sekarang = datetime.now()
 
-            if hasil:
-                max_d = hasil.get('max_d')
-                max_p = hasil.get('max_p')
-                
-                if max_d is not None and max_p is not None and max_d == max_p:
-                    existing_attendance = True
-                
-        if existing_attendance:
-            cursor.close()
-            conn.close()
-            flash("Lakukan Absensi Datang terlebih dahulu", "warning")
-            return redirect(url_for('attendance'))
-    
-        # Remove prefix "data:image/png;base64;" from data URL
+        if jenis_absensi == 'pulang':
+            # Cek apakah ada absensi datang yang belum memiliki absensi pulang
+            cursor.execute('''
+                SELECT id
+                FROM absensi_datang1
+                WHERE id_karyawan = %s
+                AND id NOT IN (
+                    SELECT absensi_datang_id
+                    FROM absensi_pulang1
+                )
+                ORDER BY waktu DESC
+                LIMIT 1
+            ''', (id_karyawan,))
+            absensi_datang = cursor.fetchone()
+
+            if not absensi_datang:
+                flash("Anda belum melakukan absensi datang atau sudah melakukan absensi pulang.", "warning")
+                return redirect(url_for('attendance'))
+
+        # Validasi foto dan lokasi
         if ',' in image_data:
             image_data = image_data.split(',')[1]
 
-        # Save the captured image to a temporary file
         temp_image_path = os.path.join('static', 'images', 'data_wajah', f"temp_{id_karyawan}.png")
         with open(temp_image_path, 'wb') as f:
             f.write(base64.b64decode(image_data))
         
-        # Get the reference image path from storage
         reference_image_data = os.path.join('static', 'images', 'data_wajah', f"{id_karyawan}.png")
-        
-        # Compare images
         is_same, similarity = face_comparison(temp_image_path, reference_image_data, threshold=0.4)
-        print(f"Hasil Perbandingan: {'SAMA' if is_same else 'BERBEDA'}")
-        print(f"Similarity score: {similarity:.4f}")
-
-        waktu_sekarang = datetime.now()
-
-        # Remove temporary image
         os.remove(temp_image_path)
 
         if not is_same:
@@ -405,32 +389,22 @@ def handle_attendance(jenis_absensi, id_karyawan, image_data, longitude, latitud
             flash("Anda melakukan absensi di luar dari toleransi radius proyek (2km)", "warning")
             return redirect(url_for("absensi", jenis_absensi=jenis_absensi))
         
-        # Save attendance log to database
+        # Simpan absensi
         if jenis_absensi == 'datang':
-            # Generate nama file unik berdasarkan id_karyawan dan timestamp
             image_filename = f"{id_karyawan}_{waktu_sekarang.strftime('%Y%m%d_%H%M%S')}.jpeg"
-            image_path = os.path.join( 'static', 'images', image_filename)
-
-            # Simpan gambar yang diambil ke file permanen
+            image_path = os.path.join('static', 'images', image_filename)
             with open(image_path, 'wb') as f:
                 f.write(base64.b64decode(image_data))
             
             cursor.execute('''
-                INSERT INTO absensi_datang (ID_karyawan, waktu, latitude, longitude, photo, id_proyek)
+                INSERT INTO absensi_datang1 (id_karyawan, waktu, latitude, longitude, photo, id_proyek)
                 VALUES (%s, %s, %s, %s, %s, %s)
             ''', (id_karyawan, waktu_sekarang, latitude, longitude, image_filename, id_proyek))
         else:
             cursor.execute('''
-                           SELECT max(id) AS id
-                           FROM absensi_datang
-                           WHERE ID_karyawan = %s
-                           ''', (id_karyawan,))
-            max_id = cursor.fetchone()
-            id = max_id.get('id')
-            cursor.execute('''
-                INSERT INTO absensi_pulang (id, ID_karyawan, waktu, latitude, longitude, id_proyek)
+                INSERT INTO absensi_pulang1 (absensi_datang_id, id_karyawan, waktu, latitude, longitude, id_proyek)
                 VALUES (%s, %s, %s, %s, %s, %s)
-            ''', (id, id_karyawan, waktu_sekarang, latitude, longitude, id_proyek))
+            ''', (absensi_datang['id'], id_karyawan, waktu_sekarang, latitude, longitude, id_proyek))
             
         conn.commit()
         flash("Absensi berhasil disimpan.", "success")
@@ -442,7 +416,6 @@ def handle_attendance(jenis_absensi, id_karyawan, image_data, longitude, latitud
         return redirect(url_for("absensi", jenis_absensi=jenis_absensi))
     
     finally:
-        # Pastikan koneksi ke database selalu ditutup
         cursor.close()
         conn.close()
     
@@ -450,31 +423,31 @@ def get_log_absensi(id_karyawan):
     # Fetch user details
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
+    
+    # Ambil data karyawan
     cursor.execute('SELECT ID, nama FROM karyawan WHERE id = %s', (id_karyawan,))
     user = cursor.fetchone()
 
+    # Ambil log absensi
     cursor.execute('''
-                   SELECT k.nama, lp.nama_proyek, d.waktu AS waktu_datang, d.latitude AS latitude_datang, d.longitude AS longitude_datang, d.photo, p.waktu AS waktu_pulang, p.latitude AS latitude_pulang, p.longitude AS longitude_pulang
-                   FROM absensi_datang d
-                   LEFT JOIN absensi_pulang p
-                   ON d.id = p.id
-                   INNER JOIN karyawan k
-                   ON d.ID_karyawan = k.id
-                   INNER JOIN lokasi_proyek lp
-                   ON d.id_proyek = lp.id_proyek
-                   WHERE d.ID_karyawan = %s
-                   ORDER BY d.waktu DESC
-                   ''', (id_karyawan, ))
+        SELECT 
+            k.nama AS nama_karyawan,
+            lp.nama_proyek,
+            d.waktu AS waktu_datang,
+            d.latitude AS latitude_datang,
+            d.longitude AS longitude_datang,
+            d.photo AS foto,
+            p.waktu AS waktu_pulang,
+            p.latitude AS latitude_pulang,
+            p.longitude AS longitude_pulang
+        FROM absensi_datang1 d
+        LEFT JOIN absensi_pulang1 p ON d.id = p.absensi_datang_id
+        INNER JOIN karyawan k ON d.id_karyawan = k.id
+        INNER JOIN lokasi_proyek lp ON d.id_proyek = lp.id_proyek
+        WHERE d.id_karyawan = %s
+        ORDER BY d.waktu DESC
+    ''', (id_karyawan,))
     
-    # Fetch attendance logs for the user
-    # cursor.execute('''
-    #     SELECT k.nama, a.datang, a.latitude_datang, a.longitude_datang, a.photo, a.istirahat, a.latitude_istirahat, a.longitude_istirahat, a.pulang ,a.latitude_pulang, a.longitude_pulang
-    #     FROM absensi a
-    #     JOIN karyawan k ON a.id_karyawan = k.id
-    #     WHERE a.id_karyawan = %s
-    #     ORDER BY a.datang DESC
-    # ''', (id_karyawan,))
-
     logs = cursor.fetchall()
     cursor.close()
     conn.close()
@@ -483,10 +456,10 @@ def get_log_absensi(id_karyawan):
 
 def get_db_connection():
     conn = pymysql.connect(
-        host='localhost',
-        user='root',
-        password='qwerty123456#', 
-        database='projek_absensi'
+        host=os.getenv('DB_HOST'),
+        user=os.getenv('DB_USER'),
+        password=os.getenv('DB_PASSWORD'), 
+        database=os.getenv('DB_NAME')
     )
     return conn
 
@@ -551,23 +524,24 @@ def absensi(jenis_absensi):
     print(f"jenis absensi: {jenis_absensi}")
 
     if(jenis_absensi == 'pulang'):
-    # Check if user has already done the attendance
+        # Check if user has already done the attendance
         conn = get_db_connection()
-        cursor = conn.cursor(pymysql.cursors.DictCursor)
+        cursor = conn.cursor(pymysql.cursors.DictCursor) 
         cursor.execute('''
-                        SELECT MAX(d.id) AS max_d, MAX(p.id) AS max_p
-                        FROM absensi_datang d
-                        LEFT JOIN absensi_pulang p
-                        ON d.id = p.id
-                        WHERE d.id_karyawan = %s
-                        ''', (id_karyawan))
-        hasil = cursor.fetchone()
-        max_d, max_p = hasil.get('max_d'), hasil.get('max_p')
-        print(f"max_d: {max_d} max_p: {max_p}")
-        if max_d == max_p:
-            cursor.close()
-            conn.close()
-            flash("Lakukan Absensi Datang terlebih dahulu!", "warning")
+                SELECT id
+                FROM absensi_datang1
+                WHERE id_karyawan = %s
+                AND id NOT IN (
+                    SELECT absensi_datang_id
+                    FROM absensi_pulang1
+                )
+                ORDER BY waktu DESC
+                LIMIT 1
+            ''', (id_karyawan,))
+        absensi_datang = cursor.fetchone()
+
+        if not absensi_datang:
+            flash("Anda belum melakukan absensi datang atau sudah melakukan absensi pulang.", "warning")
             return redirect(url_for('attendance'))
     
     if request.method == 'POST':
@@ -580,7 +554,7 @@ def absensi(jenis_absensi):
 
     conn = get_db_connection()
     cursor = conn.cursor(pymysql.cursors.DictCursor)
-    cursor.execute('SELECT * FROM lokasi_proyek')    
+    cursor.execute('SELECT * FROM lokasi_proyek ORDER BY id_proyek DESC')    
     lokasi_proyek = cursor.fetchall()
 
     user, logs = get_log_absensi(id_karyawan)
@@ -588,26 +562,42 @@ def absensi(jenis_absensi):
     return render_template('attendance.html', user=user, logs=logs, projects=lokasi_proyek)
 
 
-@app.route('/admin_dashboard', methods=['GET','POST'])
+@app.route('/admin_dashboard', methods=['GET'])
 def admin_dashboard():
     if session['id_karyawan'] != 0:
         return redirect(url_for('login'))
-    logs=[]
-    if request.method == 'POST':
-        tanggal = request.form['tanggal']
-    # Fetch all attendance logs
+    
+    # Ambil parameter tanggal dari query string
+    tanggal1 = request.args.get('tanggal1')
+    tanggal2 = request.args.get('tanggal2')
+    
+    logs = []
+
+    if tanggal1 and tanggal2:
         conn = get_db_connection()
         cursor = conn.cursor(pymysql.cursors.DictCursor)
         cursor.execute('''
-                    SELECT k.nama, a.datang, a.latitude_datang, a.longitude_datang, a.photo, a.istirahat, a.latitude_istirahat, a.longitude_istirahat, a.pulang, a.latitude_pulang, a.longitude_pulang 
-                    FROM absensi a
-                    INNER JOIN karyawan k
-                    ON a.ID_karyawan = k.id
-                    WHERE DATE(a.datang) = %s
-                    ''', (tanggal,))
+            SELECT 
+                k.nama AS nama_karyawan,
+                lp.nama_proyek,
+                d.waktu AS waktu_datang,
+                d.latitude AS latitude_datang,
+                d.longitude AS longitude_datang,
+                d.photo AS foto,
+                p.waktu AS waktu_pulang,
+                p.latitude AS latitude_pulang,
+                p.longitude AS longitude_pulang
+            FROM absensi_datang1 d
+            LEFT JOIN absensi_pulang1 p ON d.id = p.absensi_datang_id
+            INNER JOIN karyawan k ON d.id_karyawan = k.id
+            INNER JOIN lokasi_proyek lp ON d.id_proyek = lp.id_proyek
+            WHERE DATE(d.waktu) BETWEEN %s AND %s
+            ORDER BY d.waktu DESC
+        ''', (tanggal1, tanggal2))
         logs = cursor.fetchall()
         cursor.close()
         conn.close()
+
     return render_template('admin_dashboard.html', logs=logs)
 
 if __name__ == '__main__':
